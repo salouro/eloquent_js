@@ -1,2 +1,6 @@
-teste
-##KKKKK MAN
+# KKK EAE MAN
+. teste
+. teste
+. teste
+
+var = Teste(teste);
