@@ -1,13 +1,13 @@
 var plan = ["############################",
-            "#      #    #      o      ##",
+            "#a     #    #      o       #",
             "#                          #",
-            "#          #####           #",
+            "#         a#####           #",
             "##         #   #    ##     #",
             "###           ##     #     #",
-            "#           ###      #     #",
+            "#           ###      # a   #",
             "#   ####                   #",
             "#   ##       o             #",
-            "# o  #         o       ### #",
+            "# o  #       a o       ### #",
             "#    #                     #",
             "############################"];
 /*for (var line in plan)
@@ -15,24 +15,24 @@ var plan = ["############################",
 
 function toString(arr){
   var result = "";
-	for (var line in arr)
+    for (var line in arr)
       result += arr[line] + "\n";
   return result
 }
 
 function Vector(x, y){
-	this.x = x;
-  	this.y = y;
+    this.x = x;
+    this.y = y;
 }
 
 Vector.prototype.plus = function(vec){
-	return new Vector(this.x + vec.x, this.y + vec.y);
+    return new Vector(this.x + vec.x, this.y + vec.y);
 }
 
 function Grid(width, height){
-	this.space = new Array(width * height);
-  	this.width = width;
-  	this.height = height;
+    this.space = new Array(width * height);
+    this.width = width;
+    this.height = height;
 }
 
 Grid.prototype.isInside = function(vector){
@@ -104,10 +104,10 @@ World.prototype.toString = function(){
   var output = "";
   for (var y = 0; y < this.grid.height; y++){
     for (var x = 0; x < this.grid.width; x++){
-      var element = grid.get(new Vector(x, y));
+      var element = this.grid.get(new Vector(x, y));
       output += charFromElement(element);
     }
-
+    output += "\n";
   }
   return output;
 }
@@ -128,8 +128,8 @@ World.prototype.turn = function() {
   var acted = [];
   this.grid.forEach(function(critter, vector){
     if (critter.act && acted.indexOf(critter == -1)){
-      acted.push(critter);
-      this.letAct(critter, vector);
+        acted.push(critter);
+        this.letAct(critter, vector);
     }
   }, this);
 };
@@ -148,7 +148,7 @@ World.prototype.letAct = function(critter, vector){
     var dest = this.checkDestination(action, vector);
     if (dest && this.grid.get(dest) == null){
       this.grid.set(vector, null);
-      this.grid.set(dest, null);
+      this.grid.set(dest, critter);
     }
   }
 };
@@ -160,7 +160,7 @@ function View(world, vector){
 
 View.prototype.look = function(dir){
   var target = this.vector.plus(directions[dir]);
-  if (this.world.isInside(target))
+  if (this.world.grid.isInside(target))
     return charFromElement(this.world.grid.get(target));
   else
     return "#";
@@ -169,20 +169,136 @@ View.prototype.look = function(dir){
 View.prototype.findAll = function(chr){
   var found = [];
   for (var dir in directions){
-    if (this.look(dir) == ch)
+    if (this.look(dir) == chr)
       found.push(dir);
   }
   return found;
 };
 
 View.prototype.find = function(chr){
-  var found = this.foundAll(chr);
+  var found = this.findAll(chr);
   if (found.length == 0) return null;
   return randomElement(found);
 };
 
-for (var i = 0; i < 8; i++){
-  world.turn();
-  console.log(world.toString());
+function dirPlus(dir, n){
+  var index = directionNames.indexOf(dir);
+  return directionNames[(index + n + 8) % 8];
 }
-//animateWorld(valley);
+
+function WallFollower(){
+  this.dir = "n";
+}
+
+WallFollower.prototype.act = function(view) { 
+  var start = this.dir;
+  if (view.look(dirPlus(this.dir, -3)) != " ")
+    start = this.dir = dirPlus(this.dir, -2);
+  while (view.look(this.dir) != " "){
+    this.dir = dirPlus(this.dir, 1);
+    if (this.dir == start) break;
+  }
+
+  return {type : "move", direction : this.dir};
+};
+
+function LifelikeWorld(map, legend){
+  World.call(this, map, legend);
+}
+LifelikeWorld.prototype = Object.create(World.prototype);
+
+var actionTypes = Object.create(null);
+
+LifelikeWorld.prototype.letAct = function(critter, vector){
+  var action = critter.act(new View(this, vector));
+  var handled = action &&
+    action.type in actionTypes &&
+    actionTypes[action.type].call(this, critter, vector, action);
+  if (!handled){
+    critter.energy -= 0.2;
+    if (critter.energy <= 0)
+      this.grid.set(vector, null);
+  }
+};
+
+
+actionTypes.grow = function(critter) { 
+  critter.energy += 0.5;
+  return true;
+};
+actionTypes.move = function(critter, vector, action){
+  var dest = this.checkDestination(action, vector);
+  if (dest == null  ||  critter.energy <= 1  ||  this.grid.get(dest) != null)
+    return false;
+  critter.energy -= 1;
+  this.grid.set(vector, null);
+  this.grid.set(dest, critter);
+  return true;
+};
+actionTypes.eat = function(critter, vector, action){
+  var dest = this.checkDestination(action, vector);
+  var atDest = dest != null && this.grid.get(dest);
+  if (!atDest || atDest.energy == null)
+    return false;
+  critter.energy += atDest.energy;
+  this.grid.set(dest, null);
+  return true;
+};
+actionTypes.reproduce = function(critter, vector, action){
+  var baby = elementFromChar(this.legend, critter.originChar);
+  var dest = this.checkDestination(action, vector);
+  if (dest == null  ||  critter.energy <= (2 * baby.energy)  ||  this.grid.get(dest) != null)
+    return false;
+  critter.energy -= 2 * baby.energy;
+  this.grid.set(dest, baby);
+  return true;
+};
+
+function Plant(){
+  this.energy = 3 + Math.random() * 4;
+}
+Plant.prototype.act = function(view){
+  if (this.energy > 15){
+    var space = view.find(" ");
+    if(space)
+      return {type: "reproduce", direction: space};
+  }
+  if (this.energy < 20)
+    return {type: "grow"};
+};
+
+function PlantEater(){
+  this.energy = 20;
+}
+PlantEater.prototype.act = function(view) {
+  var space = view.find(" ");
+  if (this.energy > 60 && space)
+    return {type: "reproduce", direcition: space};
+  var plant = view.find("*");
+  if (plant)
+    return {type: "eat", direction: plant};
+  if (space)
+    return {type: "move", direction: space};
+};
+
+var valley = new LifelikeWorld(
+  ["####################",
+   "##      *#####*  *##",
+   "#**  **#########* ##",
+   "##**   **#####**   #",
+   "## o    **###**    #",
+   "#          #       #",
+   "#  o            o  #",
+   "#        o     ##  #",
+   "#      *##     ## *#",
+   "#           o#######",
+   "####################"],
+   {"o": PlantEater,
+    "#": Wall,
+    "*": Plant});
+
+for (var i = 0; i < 10; i++){
+  valley.turn();
+  console.log(valley.toString());
+}
+
