@@ -6,10 +6,10 @@
 function Critter(energy){
 	this.energy = energy;
 };
-Critter.move = function(vector, dest){};
-Critter.eat = function(vector, target){return this.energy;};
-Critter.grow = function(){};
-Critter.reproduce = function(vector){};
+Critter.move = function(vector, dest){console.log("move to somewhere else")};
+Critter.eat = function(vector, target){console.log("eat something");};
+Critter.grow = function(){console.log("I'm growing stronger")};
+Critter.reproduce = function(vector){console.log("I'm fucking")};
 
 //Plant extends Critter
 function Plant(){
