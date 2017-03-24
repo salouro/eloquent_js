@@ -13,5 +13,5 @@ StretchCell.prototype.minHeight = function(){
 }
 
 StretchCell.prototype.draw = function(w, h){
- 	return this.inner.draw(w, h); 
-}
+ 	return this.inner.draw(w, h);
+ }
