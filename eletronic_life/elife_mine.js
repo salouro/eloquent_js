@@ -18,7 +18,7 @@ function randomElement(array){
 }
 
 function elementFromChar(legend, ch){
-	if (ch == " ") 
+	if (ch == " ")
 		return null;
 	var element = new legend[ch]();
 	element.originChar = ch;
@@ -34,14 +34,38 @@ function charFromElement(legend, element){
 //action
 var actionTypes = Object.create(null);
 
-actionTypes.move = function(vector, dest, critter){
-	dest = vector.plus(dest);
+actionTypes.move = function(vector, critter, dir){
+	dest = this.checkDestination(dir, vector);
 	var target = this.grid.get(dest);
-  	console.log(vector);
- 	console.log(dest);
-  	console.log(target);
  	this.grid.set(dest, critter);
 	this.grid.set(vector, target);
+	critter.energy -= 0.5;
+};
+
+actionTypes.eat = function(vector, critter, dir){
+	dest = this.checkDestination(dir, vector);
+	var target = this.grid.get(dest);
+	this.grid.set(dest, null);
+	critter.energy += target.energy;
+};
+
+actionTypes.sleep = function(vector, critter){
+	critter.energy += Math.ceil(0.5 + Math.random() * 2);
+};
+
+actionTypes.grow = function(vector, critter){
+	critter.energy += Math.floor(1 + Math.random() * 2);
+};
+
+actionTypes.reproduce = function(vector, critter, dir){
+	var dest = this.checkDestination(dir, vector);
+	var child = elementFromChar(this.legend, critter.originChar);
+	this.grid.set(dest, child);
+	critter.energy -= 20 + child.energy;
+};
+
+actionTypes.die = function(vector, critter){
+	this.grid.set(vector, null);
 };
 //Vector
 
@@ -57,48 +81,52 @@ Vector.prototype.plus = function(vector){
 //Wall
 function Wall(){ }
 
-//Critter
-//move()
-//eat()
-//grow()
-//reproduce()
-function Critter(energy){
-	this.energy = energy;
-};
-Critter.move = function(vector, dest){console.log("move to somewhere else")};
-Critter.eat = function(vector, target){console.log("eat something");};
-Critter.grow = function(){console.log("I'm growing stronger")};
-Critter.reproduce = function(vector){console.log("I'm fucking")};
 
-//Plant extends Critter
+//Plant
 function Plant(){
-	Critter.call(this, Math.floor(3 + Math.random() * 4));
+	this.energy = Math.floor(3 + Math.random() * 7);
+	this.age = 0;
+	this.maxAge = Math.floor(120 + Math.random() * 50);
 }
-//inheritance
-Plant.prototype = Object.create(Critter);
 //act interface
 Plant.prototype.act = function(view){
-	//to-do
+	if (this.energy < 30 || !(dir = view.find(" ")))
+		return {type : "grow"};
+	else
+		return {type : "reproduce", direction : dir};
 };
 
-//Herbivore extends Critter
+//Herbivore
 function Herbivore(){
-	Critter.call(this, Math.floor(15 + Math.random() * 5));
+	this.energy = Math.floor(15 + Math.random() * 5);
+	this.age = 0;
+	this.maxAge = Math.floor(35 + Math.random() * 5);
+	this.direction = randomElement(directionNames);
 }
-//inheritance
-Herbivore.prototype = Object.create(Critter);
 //act interface
 Herbivore.prototype.act = function(view){
-	if (dir = view.find(" "))
-		return {type : "move", direction : dir};
+	if (this.age == this.maxAge){
+		return {type : "die"};
+	} else{
+		if (this.energy > 60 && (dir = view.find(" ")))
+			return {type : "reproduce", direction : dir};
+		else if (this.energy > 0.5)
+			if (dir = view.find("*"))
+				return {type : "eat", direction : dir};
+			if (view.look(this.direction) != " "  ||  !this.direction){
+				if (dir = view.find(" "))
+					this.direction = dir;
+				else
+					return {type : "sleep"};
+			}
+			return {type : "move", direction : this.direction};
+	}
 };
 
-//Carnivore extends Critter
+//Carnivore
 function Carnivore(){
-	Critter.call(this, Math.floor(20 + Math.random() * 3));
+	this.energy = this, Math.floor(20 + Math.random() * 3);
 }
-//inheritance
-Carnivore.prototype = Object.create(Critter);
 //act interface
 Carnivore.prototype.act = function(view){
 	//to-do
@@ -107,6 +135,8 @@ Carnivore.prototype.act = function(view){
 //World
 //turn()
 //letAct()
+//toString()
+//checkDestination()
 function World(plan, legend){
   	var grid = new Grid(plan[0].length, plan.length)
 	this.grid = grid;
@@ -124,14 +154,17 @@ World.prototype.turn = function(){
 		if (critter.act && acted.indexOf(critter) == -1){
 			acted.push(critter);
 			this.letAct(vector, critter);
+			++critter.age;
 		}
 	}, this)
 };
+
 World.prototype.letAct = function(vector, critter){
 	var action = critter.act(new View(this, vector));
-	if (action.type in actionTypes)
-		actionTypes[action.type].call(this, vector, directions[action.direction], critter);
+	if (action && action.type in actionTypes)
+		actionTypes[action.type].call(this, vector, critter, action.direction);
 };
+
 World.prototype.toString = function(){
 	var result = "";
 	for (var y = 0; y < this.grid.height; y++){
@@ -140,6 +173,14 @@ World.prototype.toString = function(){
 		result += "\n";
 	}
   return result;
+};
+
+World.prototype.checkDestination = function(dir, vector){
+	if (directions.hasOwnProperty(dir)){
+		var dest = vector.plus(directions[dir]);
+		if (this.grid.isInside(dest))
+			return dest;
+	}
 };
 
 //Grid
@@ -199,14 +240,15 @@ View.prototype.find = function(ch){
 };
 
 //start
-var plan = ["####",
-			"#  #",
-			"# o#",
-			"####",];
+var plan = ["##########################################",
+			"#                                        #",
+			"#                              o         #",
+			"###############################          #",
+			"#              ***************           #",
+			"#  ****              ###         o       #",
+			"####### *    ********* #                 #",
+			"##########################################"];
 
-var world = new World(plan, {"#" : Wall, 
-							 "o" : Herbivore});
-for (var i = 0; i < 10; i++){
-  	world.turn();
-  	console.log(world.toString());
-}
+var world = new World(plan, {"#" : Wall,
+							 "o" : Herbivore,
+							 "*" : Plant});
