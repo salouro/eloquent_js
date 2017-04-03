@@ -1,3 +1,5 @@
+// Run code here in the context of Chapter 7
+
 //Utilities
 
 var directions = {
@@ -12,6 +14,10 @@ var directions = {
 };
 
 var directionNames = "n ne e se s sw w nw".split(" ");
+
+function dirPlus(vector, dir){
+	return vector.plus(directon.dir);
+}
 
 function randomElement(array){
 	return array[Math.floor(Math.random() * array.length)];
@@ -84,13 +90,15 @@ function Wall(){ }
 
 //Plant
 function Plant(){
-	this.energy = Math.floor(3 + Math.random() * 7);
+	this.energy = Math.floor(3 + Math.random() * 10);
 	this.age = 0;
 	this.maxAge = Math.floor(120 + Math.random() * 50);
 }
 //act interface
 Plant.prototype.act = function(view){
-	if (this.energy < 30 || !(dir = view.find(" ")))
+	if (this.age == this.maxAge)
+		return {type : "die"};
+	if (this.energy < 32 || !(dir = view.find(" ")))
 		return {type : "grow"};
 	else
 		return {type : "reproduce", direction : dir};
@@ -100,8 +108,9 @@ Plant.prototype.act = function(view){
 function Herbivore(){
 	this.energy = Math.floor(15 + Math.random() * 5);
 	this.age = 0;
-	this.maxAge = Math.floor(35 + Math.random() * 5);
-	this.direction = randomElement(directionNames);
+	this.maxAge = Math.floor(50 + Math.random() * 5);
+  	this.direction = [];
+	this.direction[0] = randomElement(directionNames);
 }
 //act interface
 Herbivore.prototype.act = function(view){
@@ -241,7 +250,7 @@ View.prototype.find = function(ch){
 
 //start
 var plan = ["##########################################",
-			"#                                        #",
+			"#*                                       #",
 			"#                              o         #",
 			"###############################          #",
 			"#              ***************           #",
@@ -252,3 +261,12 @@ var plan = ["##########################################",
 var world = new World(plan, {"#" : Wall,
 							 "o" : Herbivore,
 							 "*" : Plant});
+/*
+function seek(target, range, view){
+	var routes = [];
+	for (d in directionNames)
+		console.log(directionNames[d]);
+	return "ass";
+}
+
+console.log(seek("*", 2, new View(world, new Vector(5, 3))));*/
